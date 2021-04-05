@@ -11,6 +11,7 @@ from tensorboardX import SummaryWriter
 from torch import nn
 from torch.utils.data import Dataset
 
+torch.manual_seed(42) 
 
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -24,13 +25,14 @@ LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--learning_rate', type=float, default=1e-3)
-parser.add_argument('--batch_size', type=int, default=1)
+parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--max_epoch', type=int, default=200)
-parser.add_argument('--input_size', type=int, default=200)
-parser.add_argument('--hidden_size', type=int, default=64)
+parser.add_argument('--input_size', type=int, default=800)
+parser.add_argument('--hidden_size', type=int, default=256)
 parser.add_argument('--output_size', type=int, default=6)
 parser.add_argument('--num_layers', type=int, default=2)
-parser.add_argument('--drop_rate', type=float, default=0.6)
+parser.add_argument('--drop_rate', type=float, default=0.5)
+parser.add_argument('--bidirectional', type=bool, default=True)
 FLAGS = parser.parse_args()
 
 
@@ -38,53 +40,53 @@ LR = FLAGS.learning_rate
 BATCH_SIZE = FLAGS.batch_size
 MAX_EPOCH = FLAGS.max_epoch
 
+SEQ_LEN = 350
+OVERLAP_FACTOR = 0.9
+
 INPUT_SIZE = FLAGS.input_size
 HIDDEN_SIZE = FLAGS.hidden_size
 OUTPUT_SIZE = FLAGS.output_size
 NUM_LAYERS = FLAGS.num_layers
-DROP_PROB = FLAGS.drop_rate
-
-
-class MyDataset(Dataset):
-    def __init__(self, data, label):
-        self.data = data
-        self.label = label
-
-    def __getitem__(self, index):
-        data = torch.FloatTensor(self.data[index])
-        label = torch.LongTensor(self.label[index])
-        return data, label
-
-    def __len__(self):
-        return len(self.data)
-
-
-class LSTM(nn.Module):
-    def __init__(self):
-        super(LSTM, self).__init__()
-
-        self.lstm = nn.LSTM(
-            input_size=INPUT_SIZE,
-            hidden_size=HIDDEN_SIZE,
-            num_layers=NUM_LAYERS,
-            batch_first=True,
-            dropout=DROP_PROB
-        )
-        # fully connected layer (num_directions*hidden_size)
-        self.fc = nn.Linear(HIDDEN_SIZE, OUTPUT_SIZE)
-        self.act = nn.ReLU()
-
-    def forward(self, x):
-        # x: (batch, time step, input_size) r_out: (batch, time step, num_directions*hidden size)
-        r_out, (h_c, h_h) = self.lstm(x)
-        out = self.fc(r_out[:, :, :])
-        return out
+DROP_RATE = FLAGS.drop_rate
+BIDIRECTIONAL = FLAGS.bidirectional
+NUM_DIRECTIONS = 2 if BIDIRECTIONAL else 1
 
 
 def log_string(out_str):
     LOG_FOUT.write(out_str+'\n')
     LOG_FOUT.flush()
     print(out_str)
+
+
+def load_data():
+    label = loadmat('data/label.mat')['new_label']
+    data = loadmat('data/data.mat')['Doppler_data']
+    feat_dims = data.shape[0]
+    seq_len = data.shape[1]
+    data_size = data.shape[2]
+    raw_x = np.zeros([feat_dims, seq_len, data_size], dtype=np.float32)
+    raw_y = np.zeros([1, seq_len, data_size], dtype=np.int64)
+    for i in range(data_size):
+        raw_x[:, :, i] = data[:, :, i]
+        raw_y[:, :, i] = label[i][0] - 1  # convert the indexing format
+    data_x = raw_x.transpose((2, 1, 0))  # (data_size, seq_len, feat_dims)
+    data_y = raw_y.transpose((2, 1, 0))
+
+    # data segmentation
+    overlap_factor = OVERLAP_FACTOR
+    window_len = SEQ_LEN
+    data_x, data_y = sliding_window(data_x, data_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
+    suffled_x, suffled_y, _ = shuffle_data(data_x, data_y)
+
+    # train test split
+    data_size = data_x.shape[0]
+    train_data_ratio = 0.8
+    train_data_len = round(train_data_ratio*data_size)
+    train_x = data_x[:train_data_len, :, :]
+    train_y = data_y[:train_data_len, :, :]
+    test_x = data_x[train_data_len:, :, :]
+    test_y = data_y[train_data_len:, :, :]
+    return train_x, train_y, test_x, test_y
 
 
 def sliding_window(data_x, data_y, overlap_factor, window_len):
@@ -120,50 +122,68 @@ def sliding_window(data_x, data_y, overlap_factor, window_len):
     return new_x, new_y
 
 
-def load_data():
-    label = loadmat('data/label.mat')['new_label']
-    data = loadmat('data/data.mat')['Doppler_data']
-    feat_dims = data.shape[0]
-    seq_len = data.shape[1]
-    data_size = data.shape[2]
-    raw_x = np.zeros([feat_dims, seq_len, data_size], dtype=np.float32)
-    raw_y = np.zeros([1, seq_len, data_size], dtype=np.int64)
-    for i in range(data_size):
-        raw_x[:, :, i] = data[:, :, i]
-        raw_y[:, :, i] = label[i][0] - 1  # convert the indexing format
-    data_x = raw_x.transpose((2, 1, 0))  # (data_size, seq_len, feat_dims)
-    data_y = raw_y.transpose((2, 1, 0))
-
-    # data segmentation
-    overlap_factor = 0.9
-    window_len = 100
-    # feat_dim unchanged, seq_len shortened, data_size enlarged
-    data_x, data_y = sliding_window(data_x, data_y, overlap_factor, window_len)
-    data_size = data_x.shape[0]
-    seq_len = data_x.shape[1]
-
-    # train test split
-    train_data_ratio = 0.8
-    train_data_len = round(train_data_ratio*data_size)
-    train_x = data_x[:train_data_len, :, :]
-    train_y = data_y[:train_data_len, :, :]
-    test_x = data_x[train_data_len:, :, :]
-    test_y = data_y[train_data_len:, :, :]
-    return train_x, train_y, test_x, test_y
-
-
-def cal_acc(outs, y):
-    """ Calculate the accuracy of one batch on CPU
-        Parameters:
-            outs: model outputs with shape (batch_size*seq_len, output_size) in tensor
-            y: ground truth labels with shape (batch_size*seq_len, 1) in tensor
+def shuffle_data(data, labels):
+    """ Shuffle data and labels
+        Input:
+            data:
+            labels:
         Return:
-            acc: classification accuracy in float
+            shuffled data, labels and shuffled indices
     """
-    pred = torch.max(outs, 1)[1].data.cpu().numpy()
-    y = y.data.cpu().numpy()
-    acc = float((pred == y).astype(int).sum()) / float(y.size)
-    return acc
+    idx = np.arange(len(labels))
+    np.random.shuffle(idx)
+    return data[idx, ...], labels[idx, ...], idx
+
+
+class MyDataset(Dataset):
+    def __init__(self, data, label):
+        self.data = data
+        self.label = label
+
+    def __getitem__(self, index):
+        data = torch.FloatTensor(self.data[index])
+        label = torch.LongTensor(self.label[index])
+        return data, label
+
+    def __len__(self):
+        return len(self.data)
+
+
+class LSTM(nn.Module):
+    def __init__(self):
+        super(LSTM, self).__init__()
+
+        self.lstm = nn.LSTM(
+            input_size=INPUT_SIZE,
+            hidden_size=HIDDEN_SIZE,
+            num_layers=NUM_LAYERS,
+            batch_first=True,
+            dropout=DROP_RATE,
+            bidirectional=BIDIRECTIONAL
+        )
+
+        # fully connected layer (num_directions*hidden_size)
+        self.fc = nn.Linear(HIDDEN_SIZE*NUM_DIRECTIONS, 128) # double hidden size for bidirectional
+        self.fc2 = nn.Linear(128, OUTPUT_SIZE)
+        self.dp = nn.Dropout(p=DROP_RATE)
+
+    # initialize hidden layer
+    def init_hidden(self):
+        h_0 = torch.randn(NUM_LAYERS*NUM_DIRECTIONS, BATCH_SIZE, HIDDEN_SIZE).to(DEVICE)
+        c_0 = torch.randn(NUM_LAYERS*NUM_DIRECTIONS, BATCH_SIZE, HIDDEN_SIZE).to(DEVICE)
+        return h_0, c_0
+
+    def forward(self, x):
+        self.hidden = self.init_hidden()
+        # input: (batch, seq_len, input_size) output: (batch, seq_len, num_directions*hidden size)
+        x, (h_n, c_n) = self.lstm(x, self.hidden)
+        x = x.contiguous().view(-1, HIDDEN_SIZE*NUM_DIRECTIONS)
+        x = self.fc(x)
+        x = self.dp(x)
+        x = self.fc2(x)
+        x = self.dp(x)
+        outputs = x.view(BATCH_SIZE, SEQ_LEN, OUTPUT_SIZE)[:,-1,:]
+        return outputs
 
 
 def train_one_epoch(epoch, train_writer, train_loader, lstm, loss_func, optimizer):
@@ -171,18 +191,20 @@ def train_one_epoch(epoch, train_writer, train_loader, lstm, loss_func, optimize
 
     epoch_loss = 0
     epoch_acc = 0
-    num_batches = len(list(enumerate(train_loader)))
+    num_batches = 0
 
     for step, (train_x_tensor, train_y_tensor) in enumerate(train_loader):  # max step is num_batch
         train_x_tensor = train_x_tensor.to(DEVICE)
-        train_y_tensor = train_y_tensor.squeeze_().to(DEVICE)
+        train_y_tensor = train_y_tensor.to(DEVICE)
 
-        train_outs = lstm(train_x_tensor).view(-1, OUTPUT_SIZE)  # 要不要view
+        train_y_tensor = train_y_tensor[:,-1,:].view(-1)
+        train_outs = lstm(train_x_tensor).view(-1, OUTPUT_SIZE)        
         loss = loss_func(train_outs, train_y_tensor)
         acc = cal_acc(train_outs, train_y_tensor)
 
         epoch_loss += loss.item()
         epoch_acc += acc
+        num_batches += 1
 
         optimizer.zero_grad()  # clear gradient for each batch
         loss.backward()
@@ -200,19 +222,21 @@ def eval_one_epoch(epoch, test_writer, test_loader, lstm, loss_func):
 
     epoch_loss = 0
     epoch_acc = 0
-    num_batches = len(list(enumerate(test_loader)))
+    num_batches = 0
 
     with torch.no_grad():
         for step, (test_x_tensor, test_y_tensor) in enumerate(test_loader):
             test_x_tensor = test_x_tensor.to(DEVICE)
-            test_y_tensor = test_y_tensor.squeeze_().to(DEVICE)
+            test_y_tensor = test_y_tensor.to(DEVICE)
 
+            test_y_tensor = test_y_tensor[:,-1,:].view(-1)
             test_outs = lstm(test_x_tensor).view(-1, OUTPUT_SIZE)
             loss = loss_func(test_outs, test_y_tensor)
             acc = cal_acc(test_outs, test_y_tensor)
 
             epoch_loss += loss.item()
             epoch_acc += acc
+            num_batches += 1
 
     test_writer.add_scalar('Loss/test', epoch_loss / num_batches, epoch)
     test_writer.add_scalar('Accuracy/test', epoch_acc / num_batches, epoch)
@@ -221,15 +245,29 @@ def eval_one_epoch(epoch, test_writer, test_loader, lstm, loss_func):
     log_string('test accuracy: %f' % (epoch_acc / num_batches))
 
 
+def cal_acc(outs, y):
+    """ Calculate the accuracy of one batch on CPU
+        Parameters:
+            outs: model outputs with shape (batch_size*seq_len, output_size) in tensor
+            y: ground truth labels with shape (batch_size*seq_len, 1) in tensor
+        Return:
+            acc: classification accuracy in float
+    """
+    pred = torch.max(outs, 1)[1].data.cpu().numpy()
+    y = y.data.cpu().numpy()
+    acc = float((pred == y).astype(int).sum()) / float(y.size)
+    return acc
+
+
 def train():
-    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train5'))
-    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test5'))
+    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train12-randn'))
+    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test12-randn'))
 
     train_x, train_y, test_x, test_y = load_data()
     train_loader = torch.utils.data.DataLoader(dataset=MyDataset(
-        train_x, train_y), batch_size=BATCH_SIZE, shuffle=True)
+        train_x, train_y), batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     test_loader = torch.utils.data.DataLoader(dataset=MyDataset(
-        test_x, test_y), batch_size=BATCH_SIZE, shuffle=False)
+        test_x, test_y), batch_size=BATCH_SIZE, shuffle=False, drop_last=True)
 
     lstm = LSTM().to(DEVICE)
     optimizer = torch.optim.Adam(lstm.parameters(), lr=LR)
