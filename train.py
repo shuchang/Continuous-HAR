@@ -6,6 +6,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torchvision.transforms as transforms
 from scipy.io import loadmat
 from tensorboardX import SummaryWriter
 from torch import nn
@@ -16,8 +17,10 @@ torch.manual_seed(42)
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_DIR = 'log'
+DATA_DIR = os.path.join(BASE_DIR, 'data/data.mat')
+LABEL_DIR = os.path.join(BASE_DIR, 'data/label.mat')
 
+LOG_DIR = 'log'
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
@@ -27,8 +30,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--learning_rate', type=float, default=1e-3)
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--max_epoch', type=int, default=200)
-parser.add_argument('--input_size', type=int, default=800)
-parser.add_argument('--hidden_size', type=int, default=256)
+parser.add_argument('--input_size', type=int, default=64)
+parser.add_argument('--hidden_size', type=int, default=128)
 parser.add_argument('--output_size', type=int, default=6)
 parser.add_argument('--num_layers', type=int, default=2)
 parser.add_argument('--drop_rate', type=float, default=0.5)
@@ -40,8 +43,8 @@ LR = FLAGS.learning_rate
 BATCH_SIZE = FLAGS.batch_size
 MAX_EPOCH = FLAGS.max_epoch
 
-SEQ_LEN = 350
-OVERLAP_FACTOR = 0.9
+SEQ_LEN = 200
+OVERLAP_FACTOR = 0.5
 
 INPUT_SIZE = FLAGS.input_size
 HIDDEN_SIZE = FLAGS.hidden_size
@@ -58,35 +61,70 @@ def log_string(out_str):
     print(out_str)
 
 
-def load_data():
-    label = loadmat('data/label.mat')['new_label']
-    data = loadmat('data/data.mat')['Doppler_data']
-    feat_dims = data.shape[0]
-    seq_len = data.shape[1]
-    data_size = data.shape[2]
+def load_data(data_path, label_path):
+    data = loadmat(data_path)['Doppler_data']
+    label = loadmat(label_path)['new_label']
+    feat_dims, seq_len, data_size = data.shape
     raw_x = np.zeros([feat_dims, seq_len, data_size], dtype=np.float32)
-    raw_y = np.zeros([1, seq_len, data_size], dtype=np.int64)
+    raw_y = np.zeros([1, seq_len, data_size], dtype=np.int32)
     for i in range(data_size):
         raw_x[:, :, i] = data[:, :, i]
         raw_y[:, :, i] = label[i][0] - 1  # convert the indexing format
     data_x = raw_x.transpose((2, 1, 0))  # (data_size, seq_len, feat_dims)
     data_y = raw_y.transpose((2, 1, 0))
 
+    # overlap_factor = OVERLAP_FACTOR
+    # window_len = SEQ_LEN
+    # data_x, data_y = sliding_window(data_x, data_y, overlap_factor, window_len)
+
+    # data_size = data_x.shape[0]
+    # train_data_ratio = 0.9
+    # train_data_len = round(train_data_ratio*data_size)
+    # train_x = data_x[:train_data_len, :, :]
+    # train_y = data_y[:train_data_len, :, :]
+    # test_x = data_x[train_data_len:, :, :]
+    # test_y = data_y[train_data_len:, :, :]
+
+    # train test split
+    shuffled_x, shuffled_y, _ = shuffle_data(data_x, data_y)
+    data_size = shuffled_x.shape[0]
+    train_data_ratio = 0.8    # TODO: 0.9
+    train_data_len = round(train_data_ratio*data_size)
+    train_x = shuffled_x[:train_data_len, :, :]
+    train_y = shuffled_y[:train_data_len, :, :]
+    test_x = shuffled_x[train_data_len:, :, :]
+    test_y = shuffled_y[train_data_len:, :, :]
+
     # data segmentation
     overlap_factor = OVERLAP_FACTOR
     window_len = SEQ_LEN
-    data_x, data_y = sliding_window(data_x, data_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
-    suffled_x, suffled_y, _ = shuffle_data(data_x, data_y)
+    train_x, train_y = sliding_window(train_x, train_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
+    test_x, test_y = sliding_window(test_x, test_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
 
-    # train test split
-    data_size = data_x.shape[0]
-    train_data_ratio = 0.8
-    train_data_len = round(train_data_ratio*data_size)
-    train_x = data_x[:train_data_len, :, :]
-    train_y = data_y[:train_data_len, :, :]
-    test_x = data_x[train_data_len:, :, :]
-    test_y = data_y[train_data_len:, :, :]
-    return train_x, train_y, test_x, test_y
+
+    # # train data augmentation
+    # train_x_ud = np.flip(train_x, axis=0)
+    # train_x = np.concatenate((train_x, train_x_ud), axis=0)
+    # train_y = np.concatenate((train_y, train_y), axis=0)
+
+
+    train_loader = torch.utils.data.DataLoader(dataset=MyDataset(train_x, train_y), batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+    test_loader = torch.utils.data.DataLoader(dataset=MyDataset(test_x, test_y), batch_size=BATCH_SIZE, shuffle=False, drop_last=True)
+    return train_loader, test_loader
+
+
+# def train_transforms(data):
+#     """ Augment the train set using torchvision transforms
+#     Parameters:
+#         data: batch image with (B, C, H, W) shape
+#     Return:
+#     """
+#     data = np.expand_dims(data, axis=1)
+#     transform = transforms.Compose([
+#         transforms.RandomHorizontalFlip(p=1),
+#     ])
+#     data_aug = transform(data)
+#     return data_aug
 
 
 def sliding_window(data_x, data_y, overlap_factor, window_len):
@@ -109,14 +147,14 @@ def sliding_window(data_x, data_y, overlap_factor, window_len):
     num_window = int(1 + (seq_len - window_len)/forward_len)
     new_size = data_size*num_window
     new_x = np.zeros([new_size, window_len, feat_dims], dtype=np.float32)
-    new_y = np.zeros([new_size, window_len, label_dim], dtype=np.int64)
+    new_y = np.zeros([new_size, window_len, label_dim], dtype=np.int32)
 
     idx = 0
     for i in range(data_size):
         for j in range(num_window):
-            new_x[idx, :, :] = data_x[i, forward_len *
+            new_x[idx, :, :] = data_x[i, forward_len*
                                       j: window_len + forward_len*j, :]
-            new_y[idx, :, :] = data_y[i, forward_len *
+            new_y[idx, :, :] = data_y[i, forward_len*
                                       j: window_len + forward_len*j, :]
             idx += 1
     return new_x, new_y
@@ -142,7 +180,7 @@ class MyDataset(Dataset):
 
     def __getitem__(self, index):
         data = torch.FloatTensor(self.data[index])
-        label = torch.LongTensor(self.label[index])
+        label = torch.LongTensor(self.label[index]) # nn.CrossEntropyLoss requires targets with Tensor Long type
         return data, label
 
     def __len__(self):
@@ -163,26 +201,26 @@ class LSTM(nn.Module):
         )
 
         # fully connected layer (num_directions*hidden_size)
-        self.fc = nn.Linear(HIDDEN_SIZE*NUM_DIRECTIONS, 128) # double hidden size for bidirectional
-        self.fc2 = nn.Linear(128, OUTPUT_SIZE)
-        self.dp = nn.Dropout(p=DROP_RATE)
+        self.fc = nn.Linear(HIDDEN_SIZE*NUM_DIRECTIONS, HIDDEN_SIZE) # double hidden size for bidirectional
+        self.fc2 = nn.Linear(HIDDEN_SIZE, OUTPUT_SIZE)
+        self.dropout = nn.Dropout(p=DROP_RATE)
+        self.act = nn.ReLU()
 
     # initialize hidden layer
+    # ## TODO: study the differences between randn and zero initialization
     def init_hidden(self):
         h_0 = torch.randn(NUM_LAYERS*NUM_DIRECTIONS, BATCH_SIZE, HIDDEN_SIZE).to(DEVICE)
         c_0 = torch.randn(NUM_LAYERS*NUM_DIRECTIONS, BATCH_SIZE, HIDDEN_SIZE).to(DEVICE)
         return h_0, c_0
 
     def forward(self, x):
-        self.hidden = self.init_hidden()
+        # self.hidden = self.init_hidden()
         # input: (batch, seq_len, input_size) output: (batch, seq_len, num_directions*hidden size)
-        x, (h_n, c_n) = self.lstm(x, self.hidden)
+        x, (h_n, c_n) = self.lstm(x, self.init_hidden())
         x = x.contiguous().view(-1, HIDDEN_SIZE*NUM_DIRECTIONS)
-        x = self.fc(x)
-        x = self.dp(x)
-        x = self.fc2(x)
-        x = self.dp(x)
-        outputs = x.view(BATCH_SIZE, SEQ_LEN, OUTPUT_SIZE)[:,-1,:]
+        x = self.act(self.dropout(self.fc(x)))
+        x = self.dropout(self.fc2(x))
+        outputs = x.view(BATCH_SIZE, SEQ_LEN, OUTPUT_SIZE)
         return outputs
 
 
@@ -197,7 +235,7 @@ def train_one_epoch(epoch, train_writer, train_loader, lstm, loss_func, optimize
         train_x_tensor = train_x_tensor.to(DEVICE)
         train_y_tensor = train_y_tensor.to(DEVICE)
 
-        train_y_tensor = train_y_tensor[:,-1,:].view(-1)
+        train_y_tensor = train_y_tensor.view(-1)
         train_outs = lstm(train_x_tensor).view(-1, OUTPUT_SIZE)        
         loss = loss_func(train_outs, train_y_tensor)
         acc = cal_acc(train_outs, train_y_tensor)
@@ -229,7 +267,7 @@ def eval_one_epoch(epoch, test_writer, test_loader, lstm, loss_func):
             test_x_tensor = test_x_tensor.to(DEVICE)
             test_y_tensor = test_y_tensor.to(DEVICE)
 
-            test_y_tensor = test_y_tensor[:,-1,:].view(-1)
+            test_y_tensor = test_y_tensor.view(-1)
             test_outs = lstm(test_x_tensor).view(-1, OUTPUT_SIZE)
             loss = loss_func(test_outs, test_y_tensor)
             acc = cal_acc(test_outs, test_y_tensor)
@@ -260,14 +298,10 @@ def cal_acc(outs, y):
 
 
 def train():
-    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train12-randn'))
-    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test12-randn'))
+    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train16-0.9split'))
+    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test16-0.9split'))
 
-    train_x, train_y, test_x, test_y = load_data()
-    train_loader = torch.utils.data.DataLoader(dataset=MyDataset(
-        train_x, train_y), batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
-    test_loader = torch.utils.data.DataLoader(dataset=MyDataset(
-        test_x, test_y), batch_size=BATCH_SIZE, shuffle=False, drop_last=True)
+    train_loader, test_loader = load_data(DATA_DIR, LABEL_DIR)
 
     lstm = LSTM().to(DEVICE)
     optimizer = torch.optim.Adam(lstm.parameters(), lr=LR)
