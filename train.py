@@ -17,8 +17,8 @@ torch.manual_seed(42)
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'data/data.mat')
-LABEL_DIR = os.path.join(BASE_DIR, 'data/label.mat')
+DATA_DIR = os.path.join(BASE_DIR, 'data/discrete/discrete_data.mat')
+LABEL_DIR = os.path.join(BASE_DIR, 'data/discrete/discrete_label.mat')
 
 LOG_DIR = 'log'
 if not os.path.exists(LOG_DIR):
@@ -29,8 +29,8 @@ LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
 parser = argparse.ArgumentParser()
 parser.add_argument('--learning_rate', type=float, default=1e-3)
 parser.add_argument('--batch_size', type=int, default=64)
-parser.add_argument('--max_epoch', type=int, default=200)
-parser.add_argument('--input_size', type=int, default=64)
+parser.add_argument('--max_epoch', type=int, default=500)
+parser.add_argument('--input_size', type=int, default=256)
 parser.add_argument('--hidden_size', type=int, default=128)
 parser.add_argument('--output_size', type=int, default=6)
 parser.add_argument('--num_layers', type=int, default=2)
@@ -43,7 +43,7 @@ LR = FLAGS.learning_rate
 BATCH_SIZE = FLAGS.batch_size
 MAX_EPOCH = FLAGS.max_epoch
 
-SEQ_LEN = 200
+SEQ_LEN = 256
 OVERLAP_FACTOR = 0.5
 
 INPUT_SIZE = FLAGS.input_size
@@ -63,12 +63,12 @@ def log_string(out_str):
 
 def load_data(data_path, label_path):
     data = loadmat(data_path)['Doppler_data']
-    label = loadmat(label_path)['new_label']
-    feat_dims, seq_len, data_size = data.shape
+    label = loadmat(label_path)['label']
+    data_size, feat_dims, seq_len = data.shape
     raw_x = np.zeros([feat_dims, seq_len, data_size], dtype=np.float32)
     raw_y = np.zeros([1, seq_len, data_size], dtype=np.int32)
     for i in range(data_size):
-        raw_x[:, :, i] = data[:, :, i]
+        raw_x[:, :, i] = data[i, :, :]
         raw_y[:, :, i] = label[i][0] - 1  # convert the indexing format
     data_x = raw_x.transpose((2, 1, 0))  # (data_size, seq_len, feat_dims)
     data_y = raw_y.transpose((2, 1, 0))
@@ -98,8 +98,8 @@ def load_data(data_path, label_path):
     # data segmentation
     overlap_factor = OVERLAP_FACTOR
     window_len = SEQ_LEN
-    train_x, train_y = sliding_window(train_x, train_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
-    test_x, test_y = sliding_window(test_x, test_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
+    # train_x, train_y = sliding_window(train_x, train_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
+    # test_x, test_y = sliding_window(test_x, test_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
 
 
     # # train data augmentation
@@ -138,9 +138,7 @@ def sliding_window(data_x, data_y, overlap_factor, window_len):
             new_x: segmented data with shape (new_size, win_len, feat_dims)
             new_y: segmented label with shape (new_size, win_len, 1)
     """
-    data_size = data_x.shape[0]
-    seq_len = data_x.shape[1]
-    feat_dims = data_x.shape[2]
+    data_size, seq_len, feat_dims = data_x.shape
     label_dim = data_y.shape[2]
 
     forward_len = round(window_len*(1 - overlap_factor))
@@ -298,8 +296,8 @@ def cal_acc(outs, y):
 
 
 def train():
-    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train16-0.9split'))
-    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test16-0.9split'))
+    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train18'))
+    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test18'))
 
     train_loader, test_loader = load_data(DATA_DIR, LABEL_DIR)
 
