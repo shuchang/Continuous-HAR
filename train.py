@@ -29,13 +29,13 @@ LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
 parser = argparse.ArgumentParser()
 parser.add_argument('--learning_rate', type=float, default=1e-3)
 parser.add_argument('--batch_size', type=int, default=64)
-parser.add_argument('--max_epoch', type=int, default=500)
+parser.add_argument('--max_epoch', type=int, default=1000)
 parser.add_argument('--input_size', type=int, default=256)
-parser.add_argument('--hidden_size', type=int, default=128)
+parser.add_argument('--hidden_size', type=int, default=64)
 parser.add_argument('--output_size', type=int, default=6)
 parser.add_argument('--num_layers', type=int, default=2)
 parser.add_argument('--drop_rate', type=float, default=0.5)
-parser.add_argument('--bidirectional', type=bool, default=True)
+parser.add_argument('--bidirectional', type=bool, default=False)
 FLAGS = parser.parse_args()
 
 
@@ -66,12 +66,12 @@ def load_data(data_path, label_path):
     label = loadmat(label_path)['label']
     data_size, feat_dims, seq_len = data.shape
     raw_x = np.zeros([feat_dims, seq_len, data_size], dtype=np.float32)
-    raw_y = np.zeros([1, seq_len, data_size], dtype=np.int32)
+    raw_y = np.zeros([1, data_size], dtype=np.int32)
     for i in range(data_size):
         raw_x[:, :, i] = data[i, :, :]
-        raw_y[:, :, i] = label[i][0] - 1  # convert the indexing format
+        raw_y[:, i] = label[i][0] - 1  # convert the indexing format
     data_x = raw_x.transpose((2, 1, 0))  # (data_size, seq_len, feat_dims)
-    data_y = raw_y.transpose((2, 1, 0))
+    data_y = raw_y.transpose((1, 0))
 
     # overlap_factor = OVERLAP_FACTOR
     # window_len = SEQ_LEN
@@ -91,13 +91,13 @@ def load_data(data_path, label_path):
     train_data_ratio = 0.8    # TODO: 0.9
     train_data_len = round(train_data_ratio*data_size)
     train_x = shuffled_x[:train_data_len, :, :]
-    train_y = shuffled_y[:train_data_len, :, :]
+    train_y = shuffled_y[:train_data_len, :]
     test_x = shuffled_x[train_data_len:, :, :]
-    test_y = shuffled_y[train_data_len:, :, :]
+    test_y = shuffled_y[train_data_len:, :]
 
     # data segmentation
-    overlap_factor = OVERLAP_FACTOR
-    window_len = SEQ_LEN
+    # overlap_factor = OVERLAP_FACTOR
+    # window_len = SEQ_LEN
     # train_x, train_y = sliding_window(train_x, train_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
     # test_x, test_y = sliding_window(test_x, test_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
 
@@ -207,8 +207,8 @@ class LSTM(nn.Module):
     # initialize hidden layer
     # ## TODO: study the differences between randn and zero initialization
     def init_hidden(self):
-        h_0 = torch.randn(NUM_LAYERS*NUM_DIRECTIONS, BATCH_SIZE, HIDDEN_SIZE).to(DEVICE)
-        c_0 = torch.randn(NUM_LAYERS*NUM_DIRECTIONS, BATCH_SIZE, HIDDEN_SIZE).to(DEVICE)
+        h_0 = torch.zeros(NUM_LAYERS*NUM_DIRECTIONS, BATCH_SIZE, HIDDEN_SIZE).to(DEVICE)
+        c_0 = torch.zeros(NUM_LAYERS*NUM_DIRECTIONS, BATCH_SIZE, HIDDEN_SIZE).to(DEVICE)
         return h_0, c_0
 
     def forward(self, x):
@@ -218,7 +218,7 @@ class LSTM(nn.Module):
         x = x.contiguous().view(-1, HIDDEN_SIZE*NUM_DIRECTIONS)
         x = self.act(self.dropout(self.fc(x)))
         x = self.dropout(self.fc2(x))
-        outputs = x.view(BATCH_SIZE, SEQ_LEN, OUTPUT_SIZE)
+        outputs = x.view(BATCH_SIZE, SEQ_LEN, OUTPUT_SIZE)[:,-1,:]
         return outputs
 
 
@@ -296,8 +296,8 @@ def cal_acc(outs, y):
 
 
 def train():
-    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train18'))
-    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test18'))
+    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train21-64-uni'))
+    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test21-64-uni'))
 
     train_loader, test_loader = load_data(DATA_DIR, LABEL_DIR)
 
