@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 from torch import nn
 
 from model import LSTM
-from provider import loadDataFile, MyDataset, cal_acc
+from provider import MyDataset, cal_acc, loadDataFile
 
 torch.manual_seed(42) 
 
@@ -19,16 +19,15 @@ DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TRAIN_DIR = os.path.join(BASE_DIR, 'data/train.npy')
 TEST_DIR = os.path.join(BASE_DIR, 'data/test.npy')
-
-LOG_DIR = 'log'
-if not os.path.exists(LOG_DIR):
-    os.mkdir(LOG_DIR)
+LOG_DIR = os.path.join(BASE_DIR,'log')
+if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
+MODEL_DIR = os.path.join(LOG_DIR,'model_params_Doppler_LSTM.pt')
 LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--learning_rate', type=float, default=1e-3)
-parser.add_argument('--max_epoch', type=int, default=1000)
+parser.add_argument('--max_epoch', type=int, default=500)
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--output_size', type=int, default=6)
 FLAGS = parser.parse_args()
@@ -56,11 +55,12 @@ def load_data(train_filepath, test_filepath):
 
 
 def train_one_epoch(epoch, train_writer, train_loader, lstm, loss_func, optimizer):
+ 
     lstm.train()
 
     epoch_loss = 0
     epoch_acc = 0
-    num_batches = 0
+    num_batches = len(train_loader)
 
     for step, (train_x_tensor, train_y_tensor) in enumerate(train_loader):  # max step is num_batch
         train_x_tensor = train_x_tensor.to(DEVICE)
@@ -73,7 +73,6 @@ def train_one_epoch(epoch, train_writer, train_loader, lstm, loss_func, optimize
 
         epoch_loss += loss.item()
         epoch_acc += acc
-        num_batches += 1
 
         optimizer.zero_grad()  # clear gradient for each batch
         loss.backward()
@@ -87,11 +86,12 @@ def train_one_epoch(epoch, train_writer, train_loader, lstm, loss_func, optimize
 
 
 def eval_one_epoch(epoch, test_writer, test_loader, lstm, loss_func):
+
     lstm.eval()
 
     epoch_loss = 0
     epoch_acc = 0
-    num_batches = 0
+    num_batches = len(test_loader)
 
     with torch.no_grad():
         for step, (test_x_tensor, test_y_tensor) in enumerate(test_loader):
@@ -105,7 +105,6 @@ def eval_one_epoch(epoch, test_writer, test_loader, lstm, loss_func):
 
             epoch_loss += loss.item()
             epoch_acc += acc
-            num_batches += 1
 
     test_writer.add_scalar('Loss/test', epoch_loss / num_batches, epoch)
     test_writer.add_scalar('Accuracy/test', epoch_acc / num_batches, epoch)
@@ -115,8 +114,8 @@ def eval_one_epoch(epoch, test_writer, test_loader, lstm, loss_func):
 
 
 def train():
-    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train21-64-uni'))
-    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test21-64-uni'))
+    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train3-64-LSTM'))
+    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test3-64-LSTM'))
 
     train_loader, test_loader = load_data(TRAIN_DIR, TEST_DIR)
 
@@ -133,7 +132,7 @@ def train():
         eval_one_epoch(epoch, test_writer, test_loader, lstm, loss_func)
 
     # save model parameters to files
-    torch.save(lstm.state_dict(), 'model_params.pt')
+    torch.save(lstm.state_dict(), MODEL_DIR)
 
 
 if __name__ == "__main__":

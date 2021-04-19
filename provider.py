@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+
 def sliding_window(data_x, data_y, overlap_factor, window_len):
     """ Use the sliding window method to segment the original data into small fragments
         Parameters:
