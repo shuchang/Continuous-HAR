@@ -17,17 +17,22 @@ torch.manual_seed(42)
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TRAIN_DIR = os.path.join(BASE_DIR, 'data/train.npy')
-TEST_DIR = os.path.join(BASE_DIR, 'data/test.npy')
+TRAIN_DIR = os.path.join(BASE_DIR, 'data/Doppler_train.npy')
+TEST_DIR = os.path.join(BASE_DIR, 'data/Doppler_test.npy')
+# TRAIN_DIR = os.path.join(BASE_DIR, 'data/Range_train.npy')
+# TEST_DIR = os.path.join(BASE_DIR, 'data/Range_test.npy')
+
 LOG_DIR = os.path.join(BASE_DIR,'log')
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
 MODEL_DIR = os.path.join(LOG_DIR,'model_params_Doppler_LSTM.pt')
-LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train.txt'), 'w')
+LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train_Doppler_LSTM.txt'), 'w')
+# MODEL_DIR = os.path.join(LOG_DIR,'model_params_Range_BiLSTM.pt')
+# LOG_FOUT = open(os.path.join(LOG_DIR, 'log_train_Range_BiLSTM.txt'), 'w')
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--learning_rate', type=float, default=1e-3)
-parser.add_argument('--max_epoch', type=int, default=500)
+parser.add_argument('--max_epoch', type=int, default=2000)
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--output_size', type=int, default=6)
 FLAGS = parser.parse_args()
@@ -114,8 +119,8 @@ def eval_one_epoch(epoch, test_writer, test_loader, lstm, loss_func):
 
 
 def train():
-    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train3-64-LSTM'))
-    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test3-64-LSTM'))
+    train_writer = SummaryWriter(os.path.join(LOG_DIR, 'train7-64-LSTM-Doppler'))
+    test_writer = SummaryWriter(os.path.join(LOG_DIR, 'test7-64-LSTM-Doppler'))
 
     train_loader, test_loader = load_data(TRAIN_DIR, TEST_DIR)
 

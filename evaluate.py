@@ -18,12 +18,17 @@ torch.manual_seed(42)
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TRAIN_DIR = os.path.join(BASE_DIR, 'data/train.npy')
-TEST_DIR = os.path.join(BASE_DIR, 'data/test.npy')
+# TRAIN_DIR = os.path.join(BASE_DIR, 'data/Doppler_train.npy')
+# TEST_DIR = os.path.join(BASE_DIR, 'data/Doppler_test.npy')
+TRAIN_DIR = os.path.join(BASE_DIR, 'data/Range_train.npy')
+TEST_DIR = os.path.join(BASE_DIR, 'data/Range_test.npy')
+
 LOG_DIR = os.path.join(BASE_DIR,'log')
 if not os.path.exists(LOG_DIR): os.mkdir(LOG_DIR)
-MODEL_DIR = os.path.join(LOG_DIR,'model_params_Doppler_LSTM.pt')
-LOG_FOUT = open(os.path.join(LOG_DIR, 'log_evaluate.txt'), 'w')
+# MODEL_DIR = os.path.join(LOG_DIR,'model_params_Doppler_BiLSTM.pt')
+# LOG_FOUT = open(os.path.join(LOG_DIR, 'log_evaluate_Doppler_BiLSTM.txt'), 'w')
+MODEL_DIR = os.path.join(LOG_DIR,'model_params_Range_LSTM.pt')
+LOG_FOUT = open(os.path.join(LOG_DIR, 'log_evaluate_Range_LSTM.txt'), 'w')
 
 
 parser = argparse.ArgumentParser()
@@ -81,13 +86,16 @@ def eval_one_epoch(test_loader, lstm, loss_func):
         for t, p in zip(current_label.view(-1), pred_label.view(-1)):
             confusion_matrix[t.long(),  p.long()] += 1
 
-        print(confusion_matrix)
-        print(confusion_matrix.diag()/confusion_matrix.sum(1)) # per class accuracy
-        print("macro F1 score:", f1_score(current_label.view(-1), pred_label.view(-1), average='macro'))
-        print("macro F1 score:", f1_score(current_label.view(-1), pred_label.view(-1), average='micro'))
+        acc_per_class = confusion_matrix.diag()/confusion_matrix.sum(1)
+        macro_F1 = f1_score(current_label.view(-1), pred_label.view(-1), average='macro')
+        micro_F1 = f1_score(current_label.view(-1), pred_label.view(-1), average='micro')
 
     log_string('test loss: %f' % (epoch_loss / num_batches))
     log_string('test accuracy: %f' % (epoch_acc / num_batches))
+    log_string('confusion matrix:' + str(confusion_matrix))
+    log_string('accuracy per class:' + str(acc_per_class))
+    log_string('macro F1 score: %f' % macro_F1)
+    log_string('micro F1 score: %f' % micro_F1)
 
 
 def evaluate():

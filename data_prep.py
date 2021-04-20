@@ -5,11 +5,15 @@ from provider import shuffle_data, sliding_window
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'data/discrete/discrete_data.mat')
+
+# DATA_DIR = os.path.join(BASE_DIR, 'data/discrete/discrete_Doppler_data.mat')
+DATA_DIR = os.path.join(BASE_DIR, 'data/discrete/discrete_Range_data.mat')
 LABEL_DIR = os.path.join(BASE_DIR, 'data/discrete/discrete_label.mat')
 
-TRAIN_DIR = os.path.join(BASE_DIR, 'data/train.npy')
-TEST_DIR = os.path.join(BASE_DIR, 'data/test.npy')
+# TRAIN_DIR = os.path.join(BASE_DIR, 'data/Doppler_train.npy')
+# TEST_DIR = os.path.join(BASE_DIR, 'data/Doppler_test.npy')
+TRAIN_DIR = os.path.join(BASE_DIR, 'data/Range_train.npy')
+TEST_DIR = os.path.join(BASE_DIR, 'data/Range_test.npy')
 
 
 OVERLAP_FACTOR = 0.5
@@ -17,7 +21,8 @@ SEQ_LEN = 256
 
 
 def make_data(data_path, label_path):
-    data = loadmat(data_path)['Doppler_data']
+    # data = loadmat(data_path)['Doppler_data']
+    data = loadmat(data_path)['Range_data']
     label = loadmat(label_path)['label']
     data_size, feat_dims, seq_len = data.shape
     raw_x = np.zeros([feat_dims, seq_len, data_size], dtype=np.float32)
