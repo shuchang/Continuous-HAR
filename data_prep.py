@@ -5,15 +5,14 @@ from provider import shuffle_data, sliding_window
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LABEL_DIR = os.path.join(BASE_DIR, 'data/cont/label.mat')
 
-# DATA_DIR = os.path.join(BASE_DIR, 'data/discrete/discrete_Doppler_data.mat')
-DATA_DIR = os.path.join(BASE_DIR, 'data/discrete/discrete_Range_data.mat')
-LABEL_DIR = os.path.join(BASE_DIR, 'data/discrete/discrete_label.mat')
-
-# TRAIN_DIR = os.path.join(BASE_DIR, 'data/Doppler_train.npy')
-# TEST_DIR = os.path.join(BASE_DIR, 'data/Doppler_test.npy')
-TRAIN_DIR = os.path.join(BASE_DIR, 'data/Range_train.npy')
-TEST_DIR = os.path.join(BASE_DIR, 'data/Range_test.npy')
+DATA_DIR = os.path.join(BASE_DIR, 'data/cont/doppler_data.mat')
+TRAIN_DIR = os.path.join(BASE_DIR, 'data/Doppler_train.npy')
+TEST_DIR = os.path.join(BASE_DIR, 'data/Doppler_test.npy')
+# DATA_DIR = os.path.join(BASE_DIR, 'data/cont/range_data.mat')
+# TRAIN_DIR = os.path.join(BASE_DIR, 'data/Range_train.npy')
+# TEST_DIR = os.path.join(BASE_DIR, 'data/Range_test.npy')
 
 
 OVERLAP_FACTOR = 0.5
@@ -21,17 +20,17 @@ SEQ_LEN = 256
 
 
 def make_data(data_path, label_path):
-    # data = loadmat(data_path)['Doppler_data']
-    data = loadmat(data_path)['Range_data']
-    label = loadmat(label_path)['label']
+    data = loadmat(data_path)['Doppler_data']
+    # data = loadmat(data_path)['Range_data']
+    label = loadmat(label_path)['new_label']
     data_size, feat_dims, seq_len = data.shape
     raw_x = np.zeros([feat_dims, seq_len, data_size], dtype=np.float32)
-    raw_y = np.zeros([1, data_size], dtype=np.int32)
+    raw_y = np.zeros([1, seq_len, data_size], dtype=np.int32)
     for i in range(data_size):
         raw_x[:, :, i] = data[i, :, :]
-        raw_y[:, i] = label[i][0] - 1  # convert the indexing format
+        raw_y[:, :, i] = label[i][0] - 1  # convert the indexing format
     data_x = raw_x.transpose((2, 1, 0))  # (data_size, seq_len, feat_dims)
-    data_y = raw_y.transpose((1, 0))
+    data_y = raw_y.transpose((2, 1, 0))
 
 
     # train test split
