@@ -12,7 +12,7 @@ from torch import nn
 from model import LSTM
 from provider import MyDataset, cal_acc, loadDataFile
 
-torch.manual_seed(42) 
+torch.manual_seed(42)
 
 DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -60,7 +60,7 @@ def load_data(train_filepath, test_filepath):
 
 
 def train_one_epoch(epoch, train_writer, train_loader, lstm, loss_func, optimizer):
- 
+
     lstm.train()
 
     epoch_loss = 0
@@ -72,7 +72,7 @@ def train_one_epoch(epoch, train_writer, train_loader, lstm, loss_func, optimize
         train_y_tensor = train_y_tensor.to(DEVICE)
 
         train_y_tensor = train_y_tensor.view(-1)
-        train_outs = lstm(train_x_tensor).view(-1, OUTPUT_SIZE)        
+        train_outs = lstm(train_x_tensor).view(-1, OUTPUT_SIZE)
         loss = loss_func(train_outs, train_y_tensor)
         acc = cal_acc(train_outs, train_y_tensor)
 
