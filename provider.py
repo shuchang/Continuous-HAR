@@ -3,34 +3,28 @@ import torch
 from torch.utils.data import Dataset
 
 
-def sliding_window(data_x, data_y, overlap_factor, window_len):
-    """ Use the sliding window method to segment the original data into small fragments
-        Parameters:
-            data_x: input data with shape (data_size, seq_len, feat_dims)
-            data_y: input label with shape (data_size, seq_len, 1)
-            overlap_factor: the proportion of overlap in window between two neighbor windows
-            window_len: the time length of output data and label
-        Return:
-            new_x: segmented data with shape (new_size, win_len, feat_dims)
-            new_y: segmented label with shape (new_size, win_len, 1)
+def sliding_window(data_x, data_y, overlap, win_len):
+    """ Use the sliding window method to segment data into small fragments\n
+        Parameters:\n
+        `data_x`: input data with shape (seq_len, feat_dims);\n
+        `data_y`: input label with shape (seq_len, 1);\n
+        `overlap`: the proportion of overlap in window between two neighbor windows;\n
+        `win_len`: the time length of output data and label \n
+        Return:\n
+        `new_x`: segmented data with shape (num_win, win_len, feat_dims);\n
+        `new_y`: segmented label with shape (num_win, win_len, 1)
     """
-    data_size, seq_len, feat_dims = data_x.shape
-    label_dim = data_y.shape[2]
+    seq_len, feat_dims = data_x.shape
+    label_dim = data_y.shape[1]
 
-    forward_len = round(window_len*(1 - overlap_factor))
-    num_window = int(1 + (seq_len - window_len)/forward_len)
-    new_size = data_size*num_window
-    new_x = np.zeros([new_size, window_len, feat_dims], dtype=np.float32)
-    new_y = np.zeros([new_size, window_len, label_dim], dtype=np.int32)
+    for_len = round(win_len*(1 - overlap)) # forward length
+    num_win = int(1 + (seq_len - win_len)/for_len)
+    new_x = np.zeros([num_win, win_len, feat_dims], dtype=np.float32)
+    new_y = np.zeros([num_win, win_len, label_dim], dtype=np.int32)
 
-    idx = 0
-    for i in range(data_size):
-        for j in range(num_window):
-            new_x[idx, :, :] = data_x[i, forward_len*
-                                      j: window_len + forward_len*j, :]
-            new_y[idx, :, :] = data_y[i, forward_len*
-                                      j: window_len + forward_len*j, :]
-            idx += 1
+    for i in range(num_win):
+        new_x[i, :, :] = data_x[for_len*i : win_len + for_len*i, :]
+        new_y[i, :, :] = data_y[for_len*i : win_len + for_len*i, :]
     return new_x, new_y
 
 

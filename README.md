@@ -16,16 +16,18 @@ mkdir discrete
 cd discrete
 wget http://researchdata.gla.ac.uk/848/20/Dataset_848.7z
 # unzip the data file
-cd ../
 ```
 
 ### Preprocess raw data to extract Doppler
 ```shell
+cd ..
+mkdir processed
+cd ..
+# run preprocess.m
 mkdir data
-
 python data_prep.py
 ```
-run `cont_data_processing.m` and `disc_data_processing.m`
+
 
 
 ### Train on discrete data to get Doppler embeddings

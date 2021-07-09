@@ -4,34 +4,25 @@ import os
 from provider import shuffle_data, sliding_window
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LABEL_DIR = os.path.join(BASE_DIR, 'data/cont/label.mat')
+def make_discrete_data(data_path, train_dir, test_dir):
+    """
+    """
+    data = loadmat(data_path)['Doppler']
+    label = loadmat(data_path)['Label']
 
-DATA_DIR = os.path.join(BASE_DIR, 'data/cont/doppler_data.mat')
-TRAIN_DIR = os.path.join(BASE_DIR, 'data/Doppler_train.npy')
-TEST_DIR = os.path.join(BASE_DIR, 'data/Doppler_test.npy')
-# DATA_DIR = os.path.join(BASE_DIR, 'data/cont/range_data.mat')
-# TRAIN_DIR = os.path.join(BASE_DIR, 'data/Range_train.npy')
-# TEST_DIR = os.path.join(BASE_DIR, 'data/Range_test.npy')
-
-
-OVERLAP_FACTOR = 0.5
-SEQ_LEN = 256
-
-
-def make_data(data_path, label_path):
-    data = loadmat(data_path)['Doppler_data']
-    # data = loadmat(data_path)['Range_data']
-    label = loadmat(label_path)['new_label']
-    data_size, feat_dims, seq_len = data.shape
-    raw_x = np.zeros([feat_dims, seq_len, data_size], dtype=np.float32)
-    raw_y = np.zeros([1, seq_len, data_size], dtype=np.int32)
+    data_x, data_y = [[] for _ in range(2)]
+    data_size = len(data)
     for i in range(data_size):
-        raw_x[:, :, i] = data[i, :, :]
-        raw_y[:, :, i] = label[i][0] - 1  # convert the indexing format
-    data_x = raw_x.transpose((2, 1, 0))  # (data_size, seq_len, feat_dims)
-    data_y = raw_y.transpose((2, 1, 0))
-
+        raw_x = data[i][0].T
+        seq_len, feat_dims = raw_x.shape
+        dop_x = np.abs(raw_x) # extract doppler
+        raw_y = np.zeros([seq_len, 1], dtype=np.int32)
+        raw_y[:, :] = label[i][0] - 1 # convert the indexing format
+        slide_x, slide_y = sliding_window(dop_x, raw_y, overlap=0.9, win_len=50)
+        data_x.append(slide_x)
+        data_y.append(slide_y)
+    data_x = np.vstack(data_x)
+    data_y = np.vstack(data_y) # (data_size, seq_len, feat_dims)
 
     # train test split
     shuffled_x, shuffled_y, _ = shuffle_data(data_x, data_y)
@@ -43,18 +34,13 @@ def make_data(data_path, label_path):
     test_x = shuffled_x[train_data_len:, :, :]
     test_y = shuffled_y[train_data_len:, :]
 
-    # data segmentation
-    # overlap_factor = OVERLAP_FACTOR
-    # window_len = SEQ_LEN
-    # train_x, train_y = sliding_window(train_x, train_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
-    # test_x, test_y = sliding_window(test_x, test_y, overlap_factor, window_len) # seq_len down, data_size up, feat_dim -
-
     train_dict = {'data': train_x, 'label': train_y}
     test_dict = {'data': test_x, 'label': test_y}
+    np.save(train_dir, train_dict)
+    np.save(test_dir, test_dict)
+    print(f"Data saved to {train_dir}, {test_dir}")
 
-    np.save(TRAIN_DIR, train_dict)
-    np.save(TEST_DIR, test_dict)
-    print("Data saved ...")
 
 if __name__ == "__main__":
-    make_data(DATA_DIR, LABEL_DIR)
+    make_discrete_data('datasets/processed/discrete2.mat',
+                        'data/Doppler_train.npy', 'data/Doppler_test.npy')
