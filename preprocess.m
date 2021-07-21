@@ -3,8 +3,12 @@ close all; clear; clc;
 mydir = pwd;
 input_dir = uigetdir(fullfile(mydir,'datasets'));
 output_dir = fullfile(mydir,'datasets','processed');
-dir_idx = input_dir(max(strfind(input_dir,'\'))+1);
-output_filename = strcat('discrete',dir_idx,'.mat');
+%%%%%%%%%%%%%%%%%%%%% discrete %%%%%%%%%%%%%%%%%%%%%
+% dir_idx = input_dir(max(strfind(input_dir,'\'))+1);
+% output_filename = strcat('discrete',dir_idx,'.mat');
+%%%%%%%%%%%%%%%%%%%% continuous %%%%%%%%%%%%%%%%%%%%
+output_filename = 'continuous.mat';
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 output_filepath = fullfile(output_dir,output_filename);
 cd(input_dir)
 dir_inputfile = dir('*.dat');
@@ -93,9 +97,15 @@ for fnum = 1:num_inputs
     %% Part 4: Store the complex data and labels
     Range{fnum,:,:} = Data_range_MTI;
     Doppler{fnum,:,:} = Data_spec_MTI2;
-    Label(fnum) = str2double(myname(7));
+%%%%%%%%%%%%%%%%%%%%% discrete %%%%%%%%%%%%%%%%%%%%%
+%     Label(fnum) = str2double(myname(7));
 end
-Label = Label';
+% Label = Label';
+%%%%%%%%%%%%%%%%%%%% continuous %%%%%%%%%%%%%%%%%%%%
+Label = load('Label.mat');
+Label = Label.UpdatedLabel(:);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Part 5: Save data
 save(output_filepath,'Range');
 save(output_filepath,'Doppler','-append');
 save(output_filepath,'Label','-append');
