@@ -19,15 +19,17 @@ cd datasets
 mkdir discrete
 cd discrete
 wget http://researchdata.gla.ac.uk/848/20/Dataset_848.7z
-# unzip the discrete and continuous data files
 ```
+unzip the discrete and continuous data files
 
 ### Preprocess raw data to extract Doppler
 ```shell
 cd ..
 mkdir processed
 cd ..
-# run preprocess.m on both discrete and continuous data
+```
+run `preprocess.m` on both discrete and continuous data
+```shell
 mkdir data
 python data_prep.py
 ```
