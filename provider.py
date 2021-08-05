@@ -40,6 +40,18 @@ def shuffle_data(data, labels):
     return data[idx, ...], labels[idx, ...], idx
 
 
+def split_data(data_x, data_y, split_ratio):
+    """ Split data into training set and testing set
+    """
+    data_size = data_x.shape[0]
+    train_data_len = round(split_ratio*data_size)
+    train_x = data_x[:train_data_len, :, :]
+    train_y = data_y[:train_data_len, :]
+    test_x = data_x[train_data_len:, :, :]
+    test_y = data_y[train_data_len:, :]
+    return train_x, train_y, test_x, test_y
+
+
 def load_npy(npy_filepath):
     f = np.load(npy_filepath, allow_pickle=True)
     data = f.item().get('data')
