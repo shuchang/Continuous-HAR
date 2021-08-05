@@ -74,4 +74,6 @@ def data_saver(data_x, data_y, train_dir, test_dir):
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    data_x, data_y = prep_data('datasets/preprocessed/Continuous1_48.mat', False)
+    data_saver(data_x, data_y, 'data/train_Continuous1_48.npy', 'data/test_Continuous1_48.npy')
