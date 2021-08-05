@@ -25,7 +25,7 @@ unzip the discrete and continuous data files
 ### Preprocess raw data to extract Doppler
 ```shell
 cd ..
-mkdir processed
+mkdir preprocessed
 cd ..
 ```
 run `preprocess.m` on both discrete and continuous data
