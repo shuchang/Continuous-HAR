@@ -6,34 +6,33 @@ from torch.utils.data import Dataset
 def sliding_window(data_x, data_y, overlap, win_len):
     """ Use the sliding window method to segment data into small fragments\n
         Parameters:\n
-        `data_x`: input data with shape (seq_len, feat_dims);\n
-        `data_y`: input label with shape (seq_len, 1);\n
-        `overlap`: the proportion of overlap in window between two neighbor windows;\n
-        `win_len`: the time length of output data and label \n
+            `data_x`: input data with shape (seq_len, feat_dims);\n
+            `data_y`: input label with shape (seq_len, 1);\n
+            `overlap`: the proportion of overlap in window between two neighbor windows;\n
+            `win_len`: the time length of output data and label\n
         Return:\n
-        `new_x`: segmented data with shape (num_win, win_len, feat_dims);\n
-        `new_y`: segmented label with shape (num_win, win_len, 1)
+            `slide_x`: segmented data with shape (num_win, win_len, feat_dims);\n
+            `slide_y`: segmented label with shape (num_win, win_len, 1)
     """
     seq_len, feat_dims = data_x.shape
     label_dim = data_y.shape[1]
 
     for_len = round(win_len*(1 - overlap)) # forward length
     num_win = int(1 + (seq_len - win_len)/for_len)
-    new_x = np.zeros([num_win, win_len, feat_dims], dtype=np.float32)
-    new_y = np.zeros([num_win, win_len, label_dim], dtype=np.int32)
+    slide_x = np.zeros([num_win, win_len, feat_dims], dtype=np.float32)
+    slide_y = np.zeros([num_win, win_len, label_dim], dtype=np.int32)
 
     for i in range(num_win):
-        new_x[i, :, :] = data_x[for_len*i : win_len + for_len*i, :]
-        new_y[i, :, :] = data_y[for_len*i : win_len + for_len*i, :]
-    return new_x, new_y
+        slide_x[i, :, :] = data_x[for_len*i : win_len + for_len*i, :]
+        slide_y[i, :, :] = data_y[for_len*i : win_len + for_len*i, :]
+    return slide_x, slide_y
 
 
 def shuffle_data(data, labels):
-    """ Shuffle data and labels
-        Input:
-            data:
-            labels:
-        Return:
+    """ Shuffle data and labels\n
+        Parameters:\n
+            data and labels\n
+        Return:\n
             shuffled data, labels and shuffled indices
     """
     idx = np.arange(len(labels))
@@ -67,12 +66,12 @@ class MyDataset(Dataset):
 
 
 def cal_acc(outs, y):
-    """ Calculate the accuracy of one batch on CPU
-        Parameters:
-            outs: model outputs with shape (batch_size*seq_len, output_size) in tensor
-            y: ground truth labels with shape (batch_size*seq_len, 1) in tensor
-        Return:
-            acc: classification accuracy in float
+    """ Calculate the accuracy of one batch on CPU\n
+        Parameters:\n
+            `outs`: model outputs with shape (batch_size*seq_len, output_size) in tensor;\n
+            `y`: ground truth labels with shape (batch_size*seq_len, 1) in tensor\n
+        Return:\n
+            `acc`: classification accuracy in float
     """
     pred = torch.max(outs, 1)[1].data.cpu().numpy()
     y = y.data.cpu().numpy()
