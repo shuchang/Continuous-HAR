@@ -2,18 +2,19 @@
 close all; clear; clc;
 mydir = pwd;
 input_dir = uigetdir(fullfile(mydir,'datasets'));
-output_dir = fullfile(mydir,'datasets','processed');
-%%%%%%%%%%%%%%%%%%%%% discrete %%%%%%%%%%%%%%%%%%%%%
-% dir_idx = input_dir(max(strfind(input_dir,'\'))+1);
-% output_filename = strcat('discrete',dir_idx,'.mat');
-%%%%%%%%%%%%%%%%%%%% continuous %%%%%%%%%%%%%%%%%%%%
-output_filename = 'continuous.mat';
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-output_filepath = fullfile(output_dir,output_filename);
+output_dir = fullfile(mydir,'datasets','preprocessed');
 cd(input_dir)
 dir_inputfile = dir('*.dat');
 input_filenames = {dir_inputfile.name};
 num_inputs = length(input_filenames);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% discrete %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% dir_idx = input_dir(max(strfind(input_dir,'\'))+1);
+% output_filename = strcat('Discrete',dir_idx,'_',int2str(num_inputs),'.mat');
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% continuous %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+output_filename = strcat('Continuous1_',int2str(num_inputs),'.mat');
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+output_filepath = fullfile(output_dir,output_filename);
+
 for fnum = 1:num_inputs
     filename = char(input_filenames(fnum));
     myname = filename(1:end-4);
@@ -97,14 +98,14 @@ for fnum = 1:num_inputs
     %% Part 4: Store the complex data and labels
     Range{fnum,:,:} = Data_range_MTI;
     Doppler{fnum,:,:} = Data_spec_MTI2;
-%%%%%%%%%%%%%%%%%%%%% discrete %%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% discrete %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %     Label(fnum) = str2double(myname(7));
 end
 % Label = Label';
-%%%%%%%%%%%%%%%%%%%% continuous %%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% continuous %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Label = load('Label.mat');
 Label = Label.UpdatedLabel(:);
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Part 5: Save data
 save(output_filepath,'Range');
 save(output_filepath,'Doppler','-append');
