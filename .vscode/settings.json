@@ -1,0 +1,22 @@
+{
+    "cSpell.words": [
+        "arange",
+        "astype",
+        "conda",
+        "cuda",
+        "dtype",
+        "fout",
+        "log",
+        "lstm",
+        "matplotlib",
+        "mkdir",
+        "numpy",
+        "pyplot",
+        "pytorch",
+        "scikit",
+        "scipy",
+        "sklearn",
+        "tensorboardx",
+        "vstack"
+    ]
+}
