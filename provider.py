@@ -19,8 +19,8 @@ def sliding_window(data_x, data_y, overlap, win_len):
 
     for_len = round(win_len*(1 - overlap)) # forward length
     num_win = int(1 + (seq_len - win_len)/for_len)
-    slide_x = np.zeros([num_win, win_len, feat_dims], dtype=np.float32)
-    slide_y = np.zeros([num_win, win_len, label_dim], dtype=np.int32)
+    slide_x = np.zeros([num_win, win_len, feat_dims], dtype=np.float16)
+    slide_y = np.zeros([num_win, win_len, label_dim], dtype=np.int16)
 
     for i in range(num_win):
         slide_x[i, :, :] = data_x[for_len*i : win_len + for_len*i, :]
