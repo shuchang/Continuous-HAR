@@ -11,6 +11,7 @@
         "matplotlib",
         "mkdir",
         "numpy",
+        "optim",
         "pyplot",
         "pytorch",
         "scikit",
