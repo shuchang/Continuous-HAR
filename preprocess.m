@@ -7,6 +7,7 @@ cd(input_dir)
 dir_inputfile = dir('*.dat');
 input_filenames = {dir_inputfile.name};
 num_inputs = length(input_filenames);
+keyboard
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% discrete %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % dir_idx = input_dir(max(strfind(input_dir,'\'))+1);
 % output_filename = strcat('Discrete',dir_idx,'_',int2str(num_inputs),'.mat');
@@ -55,7 +56,8 @@ for fnum = 1:num_inputs
     range_axis=freq*3e8/(2*Bw);
     time_axis=linspace(0,record_length,size(Data_range_MTI,2));
     %delete the DC component
-    Data_range_MTI=Data_range_MTI(2:size(Data_range_MTI,1),:);
+%     Data_range_MTI=Data_range_MTI(2:size(Data_range_MTI,1),:);
+    Data_range_MTI=Data_range_MTI(2:size(Data_range_MTI,1),9:size(Data_range_MTI,2));
     %% Part 2.5: Visualization of the Range-Time Image
 %     figure();
 %     colormap(jet);
@@ -103,11 +105,14 @@ for fnum = 1:num_inputs
 end
 % Label = Label';
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% continuous %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Label = load('Label.mat');
-Label = Label.UpdatedLabel(:);
+RangeLabel = load('rangelabelsfixed.mat');
+RangeLabel = RangeLabel.RangeLabels(:);
+DopplerLabel = load('Label.mat');
+DopplerLabel = DopplerLabel.UpdatedLabel(:);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Part 5: Save data
 save(output_filepath,'Range');
 save(output_filepath,'Doppler','-append');
-save(output_filepath,'Label','-append');
+save(output_filepath,'RangeLabel','-append');
+save(output_filepath,'DopplerLabel','-append');
 cd(mydir)
